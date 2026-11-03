@@ -1,35 +1,24 @@
-import { Routes, Route } from "react-router-dom";
-
-import MainLayout from "./layouts/MainLayout";
-import AdminLayout from "./layouts/AdminLayout";
-
-import Dashboard from "./pages/frontpages/Dashboard";
-import ProductDetail from "./pages/frontpages/ProductDetail";
-import Cart from "./pages/frontpages/Cart";
-import Checkout from "./pages/frontpages/Checkout";
-
+import { Routes, Route, Navigate } from "react-router-dom";
 import AdminDashboard from "./pages/adminpages/AdminDashboard";
-import Orders from "./pages/adminpages/Orders";
+import AdminLayout from "./layouts/AdminLayout";
 import AboutPage from "./pages/adminpages/AboutPage";
+import ProductForm from "./pages/adminpages/ProductForm";
+import ProductEdit from "./pages/adminpages/ProductEdit";
 
 export default function App() {
-return ( <Routes>
-{/* Halaman utama */}
-<Route element={<MainLayout />}>
-<Route path="/" element={<Dashboard />} />
-<Route path="/produk/:id" element={<ProductDetail />} />
-<Route path="/keranjang" element={<Cart />} />
-<Route path="/checkout" element={<Checkout />} /> </Route>
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
 
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<Navigate to="dashboard" replace />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="about" element={<AboutPage />} />
+        <Route path="add-product" element={<ProductForm />} />
+        <Route path="edit-product/:id" element={<ProductEdit />} />
+      </Route>
 
-  {/* Halaman admin */}
-  <Route path="/admin" element={<AdminLayout />}>
-    <Route path="dashboard" element={<AdminDashboard />} />
-    <Route path="orders" element={<Orders />} />
-    <Route path="about" element={<AboutPage />} />
-  </Route>
-</Routes>
-
-
-);
+      <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+    </Routes>
+  );
 }
