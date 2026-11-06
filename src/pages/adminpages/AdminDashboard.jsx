@@ -1,195 +1,187 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
+import { useQuery } from "@tanstack/react-query";
 import { useProducts } from "../../utils/ProductContext";
 
-const LIMIT = 5;
-
-// Mapping nama produk -> file gambar di folder /public
-const PRODUCT_IMAGES = {
-  "berkah ramadan": "/berkah ramadan.jpg",
-  "welcome little one": "/welcome little one.jpg",
-  "happily ever after": "/Happy ever after.jpg",
-  "cum laude": "/cumlaude.jpg",
-  "our story box": "/our story box.jpg",
-  "golden years": "/golden years.jpg",
-  "birthday bliss": "/birthday bliss.jpg",
-  "sweet candle box": "/sweet candles box.jpg",
-};
-
-const getProductImage = (p) => {
-  if (p.img_url) return p.img_url;
-  const file = PRODUCT_IMAGES[p.name?.trim().toLowerCase()];
-  return file ? encodeURI(file) : null; // encodeURI supaya spasi di nama file aman
-};
+const FILTERS = [
+  { key: "semua", label: "Semua" },
+  { key: "menipis", label: "Menipis" },
+  { key: "habis", label: "Habis" },
+];
 
 export default function AdminDashboard() {
-  const { getProducts, getCategories, deleteProduct } = useProducts();
-  const queryClient = useQueryClient();
-
-  const [page, setPage] = useState(1);
-  const [categoryId, setCategoryId] = useState("");
-  const [keywordInput, setKeywordInput] = useState("");
-  const [filter, setFilter] = useState({ category_id: "", keyword: "" });
-
-  const { data: categories = [] } = useQuery({
-    queryKey: ["categories"],
-    queryFn: getCategories,
-  });
+  const { getProducts } = useProducts();
+  const [filter, setFilter] = useState("semua");
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ["products", "list", page, filter],
-    queryFn: () => getProducts({ page, limit: LIMIT, ...filter }),
-    placeholderData: (prev) => prev,
+    queryKey: ["products", "dashboard"],
+    queryFn: () => getProducts({ page: 1, limit: 100 }),
   });
 
-  const items = data?.data ?? [];
-  const lastPage = data?.last_page ?? 1;
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center rounded-2xl bg-white">
+        <p className="text-[#64132F]">Memuat data dashboard...</p>
+      </div>
+    );
+  }
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    setPage(1);
-    setFilter({ category_id: categoryId, keyword: keywordInput });
-  };
+  if (isError) {
+    return (
+      <div className="rounded-2xl bg-red-50 p-6 text-center text-red-600">
+        Data dashboard gagal dimuat. Silakan muat ulang halaman.
+      </div>
+    );
+  }
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Apakah kamu yakin ingin menghapus produk ini?")) return;
-    try {
-      await deleteProduct.mutateAsync(id);
-      queryClient.invalidateQueries({ queryKey: ["products"] });
-      toast.success("Produk berhasil dihapus!");
-      if (items.length === 1 && page > 1) setPage(page - 1);
-    } catch {
-      toast.error("Terjadi kesalahan saat menghapus produk.");
-    }
-  };
+  const products = data?.data ?? [];
 
-  if (isLoading) return <p>Loading...</p>;
-  if (isError) return <p>Error loading products.</p>;
+  const stok = (p) => Number(p.stock) || 0;
+  const habis = products.filter((p) => stok(p) === 0);
+  const menipis = products.filter((p) => stok(p) > 0 && stok(p) <= 5);
+  const totalStok = products.reduce((sum, p) => sum + stok(p), 0);
+
+  const tampil =
+    filter === "habis" ? habis : filter === "menipis" ? menipis : products;
+
+  const stats = [
+    { label: "Total produk", value: products.length, color: "text-[#64132F]" },
+    { label: "Total stok", value: totalStok, color: "text-[#64132F]" },
+    { label: "Stok menipis", value: menipis.length, color: "text-[#B88A54]" },
+    { label: "Stok habis", value: habis.length, color: "text-red-700" },
+  ];
+
+  const th = "border-b border-[#EBD9CF] px-3 py-3 text-left text-sm font-semibold text-[#64132F]";
+  const td = "border-b border-[#F0E5E7] px-3 py-3";
 
   return (
-    <div className="p-4 bg-white rounded shadow">
-      <h1 className="text-xl font-bold mb-4">Manajemen Produk</h1>
+    <div className="space-y-6">
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <form onSubmit={handleSearch} className="flex flex-wrap gap-2">
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            className="border rounded-md p-2"
+      {/* BANNER */}
+      <div className="flex flex-col gap-4 rounded-2xl bg-[#64132F] p-6 text-white shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-8">
+        <div>
+          <h1 className="font-['Cormorant_Garamond'] text-3xl font-semibold">
+            Dashboard Giftly 🎁
+          </h1>
+          <p className="mt-1 text-sm text-[#F0DCB8]">
+            Selamat datang! Kelola koleksi hampers dan pesanan Giftly di sini.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/admin/product"
+            className="rounded-lg bg-white/15 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-white/25"
           >
-            <option value="">Semua Kategori</option>
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-          <input
-            value={keywordInput}
-            onChange={(e) => setKeywordInput(e.target.value)}
-            placeholder="Cari produk..."
-            className="border rounded-md p-2"
-          />
-          <button type="submit" className="bg-blue-600 text-white rounded-md px-4 py-2">
-            Cari
-          </button>
-        </form>
-
-        <Link to="/admin/add-product" className="bg-green-600 text-white rounded-md px-4 py-2">
-          + Tambah Produk
-        </Link>
+            Kelola Produk
+          </Link>
+          <Link
+            to="/admin/add-product"
+            className="rounded-lg bg-[#B88A54] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[#A07640]"
+          >
+            + Tambah Produk
+          </Link>
+        </div>
       </div>
 
-      <table className="table-auto w-full border">
-        <thead>
-          <tr className="bg-gray-100 text-left">
-            <th className="p-2 border">#</th>
-            <th className="p-2 border">Image</th>
-            <th className="p-2 border">Nama</th>
-            <th className="p-2 border">Harga</th>
-            <th className="p-2 border">Stok</th>
-            <th className="p-2 border">Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.length === 0 && (
-            <tr>
-              <td colSpan="6" className="p-4 text-center text-gray-400">
-                Tidak ada produk.
-              </td>
-            </tr>
-          )}
-          {items.map((p, index) => {
-            const imgSrc = getProductImage(p);
-            return (
-              <tr key={p.id}>
-                <td className="p-2 border">{(page - 1) * LIMIT + index + 1}</td>
-                <td className="p-2 border">
-                  {imgSrc ? (
-                    <img
-                      src={imgSrc}
-                      alt={p.name}
-                      style={{ width: 64, height: 64, objectFit: "cover", borderRadius: 6 }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  ) : (
-                    <span className="text-gray-400 text-sm">Tidak ada</span>
-                  )}
-                </td>
-                <td className="p-2 border">
-                  {p.name} <br />
-                  <small className="text-gray-500">#{p.category?.name}</small>
-                </td>
-                <td className="p-2 border">Rp. {Number(p.price).toLocaleString("id-ID")}</td>
-                <td className="p-2 border">{p.stock}</td>
-                <td className="p-2 border space-x-2">
-                  <Link to={`/admin/edit-product/${p.id}`} className="text-blue-600 hover:underline">
-                    Edit
-                  </Link>
-                  <button
-                    onClick={() => handleDelete(p.id)}
-                    className="cursor-pointer text-red-600 hover:underline"
-                  >
-                    Hapus
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-
-      <div className="mt-4 flex items-center justify-center gap-2">
-        <button
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-          disabled={page === 1}
-          className="rounded-md px-3 py-1 bg-gray-200 disabled:opacity-50"
-        >
-          Sebelumnya
-        </button>
-
-        {Array.from({ length: lastPage }, (_, i) => i + 1).map((n) => (
-          <button
-            key={n}
-            onClick={() => setPage(n)}
-            className={`rounded-md px-3 py-1 ${
-              n === page ? "bg-blue-600 text-white" : "bg-gray-200"
-            }`}
+      {/* KARTU STATISTIK */}
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {stats.map((s) => (
+          <div
+            key={s.label}
+            className="rounded-2xl border border-[#F0DCE0] bg-white p-5 shadow-sm"
           >
-            {n}
-          </button>
+            <p className="text-sm text-[#987C83]">{s.label}</p>
+            <p className={`mt-1 font-['Cormorant_Garamond'] text-4xl font-semibold ${s.color}`}>
+              {s.value}
+            </p>
+          </div>
         ))}
-
-        <button
-          onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
-          disabled={page === lastPage}
-          className="rounded-md px-3 py-1 bg-blue-600 text-white disabled:opacity-50"
-        >
-          Berikutnya
-        </button>
       </div>
+
+      {/* TABEL STOK */}
+      <div className="rounded-2xl border border-[#F0DCE0] bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="font-['Cormorant_Garamond'] text-2xl font-semibold text-[#64132F]">
+            Stok hampers
+          </h2>
+
+          <div className="flex gap-2">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition ${
+                  filter === f.key
+                    ? "bg-[#64132F] text-white"
+                    : "bg-[#F3E9EB] text-[#64132F] hover:bg-[#EBD9CF]"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full min-w-[520px] border-collapse text-sm text-[#351923]">
+            <thead>
+              <tr>
+                <th className={th}>Produk</th>
+                <th className={th}>Kategori</th>
+                <th className={th}>Harga</th>
+                <th className={th}>Stok</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {tampil.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className={`${td} py-10 text-center text-[#987C83]`}>
+                    Tidak ada produk pada filter ini.
+                  </td>
+                </tr>
+              ) : (
+                tampil.map((p) => {
+                  const n = stok(p);
+
+                  return (
+                    <tr key={p.id} className="transition hover:bg-[#FFF8F8]">
+                      <td className={td}>
+                        <div className="flex items-center gap-3">
+                          <span className="h-3 w-3 shrink-0 rounded-sm bg-[#64132F]" />
+                          {p.name}
+                        </div>
+                      </td>
+
+                      <td className={td}>{p.category?.name || "Hampers"}</td>
+
+                      <td className={`${td} whitespace-nowrap`}>
+                        Rp {Number(p.price).toLocaleString("id-ID")}
+                      </td>
+
+                      <td className={td}>
+                        {n === 0 ? (
+                          <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
+                            Habis
+                          </span>
+                        ) : n <= 5 ? (
+                          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+                            Sisa {n}
+                          </span>
+                        ) : (
+                          n
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   );
 }
